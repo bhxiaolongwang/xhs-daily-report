@@ -27,11 +27,9 @@ def main():
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     # 示例数据（之后会替换为真实小红书数据）
-    notes = [
-        {"title": "笔记 1", "like": 132, "collect": 45, "comment": 18},
-        {"title": "笔记 2", "like": 98, "collect": 30, "comment": 9},
-        {"title": "笔记 3", "like": 210, "collect": 80, "comment": 40},
-    ]
+   # 从人工输入文件读取
+with open("manual/input.json", "r", encoding="utf-8") as f:
+    notes = json.load(f)
 
     daily_data = {
         "time": now,
