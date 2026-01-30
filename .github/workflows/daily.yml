@@ -23,3 +23,10 @@ jobs:
         env:
           SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
         run: python scripts/xhs_report.py
+      - name: Commit data
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add data/
+          git commit -m "daily data snapshot" || echo "No changes to commit"
+          git push
