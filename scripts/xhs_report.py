@@ -4,17 +4,16 @@ import requests
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 
-# Server酱Key
+# 配置
 SERVERCHAN_KEY = os.getenv("SERVERCHAN_KEY")
 DATA_DIR = "data"
 INPUT_FILE = "manual/input.json"
 IMG_DIR = "charts"
+TOTAL_IMG = os.path.join(IMG_DIR, "total_chart.png")
 
 # 确保文件夹存在
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
-if not os.path.exists(IMG_DIR):
-    os.makedirs(IMG_DIR)
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(IMG_DIR, exist_ok=True)
 
 # 微信推送函数
 def send_wechat(text, img_path=None):
@@ -47,39 +46,48 @@ def load_historical(days=14):
 def generate_replicate_ideas(title):
     return [f"{title}（复刻点子 {i+1}）" for i in range(3)]
 
-# 绘制趋势图
-def plot_trends(title, historical):
-    dates = []
-    likes = []
-    collects = []
-    comments = []
-    for day in historical:
-        note = next((n for n in day["notes"] if n["title"]==title), None)
-        if note:
-            dates.append(day["time"].split()[0])
-            likes.append(note["like"])
-            collects.append(note["collect"])
-            comments.append(note["comment"])
-    if not dates:
-        return None
-    plt.figure(figsize=(6,4))
-    plt.plot(dates, likes, '-o', label='👍 Likes')
-    plt.plot(dates, collects, '-s', label='⭐ Collects')
-    plt.plot(dates, comments, '-^', label='💬 Comments')
-    # 异常标注
-    ma7_like = sum(likes[-7:])/min(len(likes),7)
-    for i, v in enumerate(likes):
-        if v > ma7_like*1.5:
-            plt.text(dates[i], v, "🔥", fontsize=12)
-    plt.title(title)
+# 绘制总趋势图（加 MA7 / MA14）
+def plot_total_trends(notes_titles, historical):
+    dates = [(datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(len(historical))]
+    plt.figure(figsize=(10,6))
+    colors = ['r','g','b','c','m','y','k']
+
+    for idx, title in enumerate(notes_titles):
+        likes, collects, comments = [], [], []
+        for day in historical:
+            note = next((n for n in day["notes"] if n["title"]==title), None)
+            if note:
+                likes.append(note["like"])
+                collects.append(note["collect"])
+                comments.append(note["comment"])
+            else:
+                likes.append(0)
+                collects.append(0)
+                comments.append(0)
+
+        color = colors[idx % len(colors)]
+        plt.plot(dates, likes, '-o', label=f"{title} 👍", color=color)
+        plt.plot(dates, collects, '-s', label=f"{title} ⭐", color=color, alpha=0.6)
+        plt.plot(dates, comments, '-^', label=f"{title} 💬", color=color, alpha=0.4)
+
+        # MA7 / MA14
+        ma7 = [sum(likes[max(0,i-6):i+1])/min(7,i+1) for i in range(len(likes))]
+        ma14 = [sum(likes[max(0,i-13):i+1])/min(14,i+1) for i in range(len(likes))]
+        plt.plot(dates, ma7, '--', color=color, alpha=0.5, label=f"{title} MA7")
+        plt.plot(dates, ma14, ':', color=color, alpha=0.5, label=f"{title} MA14")
+
+        # 异常标注
+        for i, v in enumerate(likes):
+            if len(ma7)>=i+1 and v > ma7[i]*1.5:
+                plt.text(dates[i], v, "🔥", fontsize=10)
+
+    plt.title("📊 小红书笔记趋势（含 MA7 / MA14）")
     plt.xticks(rotation=45)
-    plt.legend()
+    plt.legend(fontsize=8)
     plt.tight_layout()
-    safe_title = title[:10].replace(" ", "_")
-    img_path = os.path.join(IMG_DIR, f"{safe_title}.png")
-    plt.savefig(img_path)
+    plt.savefig(TOTAL_IMG)
     plt.close()
-    return img_path
+    return TOTAL_IMG
 
 # 主函数
 def main():
@@ -98,11 +106,15 @@ def main():
 
     # 历史数据
     historical = load_historical(days=14)
-    historical.append(daily_data)  # 包括今天
+    historical.append(daily_data)
 
-    # 遍历笔记
+    # 构建文字内容
+    message = f"## 📅 今日时间\n{now}\n\n## 📌 内容分析\n"
+    notes_titles = []
+
     for note in notes:
         title = note["title"]
+        notes_titles.append(title)
         like = note["like"]
         collect = note["collect"]
         comment = note["comment"]
@@ -120,16 +132,15 @@ def main():
         abnormal = "🔥 异常好！" if like > ma7_like*1.5 else ""
         replicate_ideas = generate_replicate_ideas(title) if abnormal else []
 
-        # 构建文字
-        text = f"- {title}\n👍 {like} (+{like_inc}) ⭐ {collect} (+{collect_inc}) 💬 {comment} (+{comment_inc}) {abnormal}"
+        message += f"- {title}\n👍 {like} (+{like_inc}) ⭐ {collect} (+{collect_inc}) 💬 {comment} (+{comment_inc}) {abnormal}\n"
         for idea in replicate_ideas:
-            text += f"\n💡 {idea}"
+            message += f"💡 {idea}\n"
 
-        # 生成图表
-        img_path = plot_trends(title, historical)
+    # 生成总图
+    img_path = plot_total_trends(notes_titles, historical)
 
-        # 微信推送
-        send_wechat(text, img_path)
+    # 微信推送文字 + 总图
+    send_wechat(message, img_path)
 
 if __name__ == "__main__":
     main()
