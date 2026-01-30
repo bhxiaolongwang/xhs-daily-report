@@ -1,23 +1,11 @@
 {
-  "time": "2026-01-30 11:49",
+  "time": "2026-01-30 12:03",
   "notes": [
     {
-      "title": "笔记 1",
-      "like": 132,
-      "collect": 45,
-      "comment": 18
-    },
-    {
-      "title": "笔记 2",
-      "like": 98,
+      "title": "示例笔记 1",
+      "like": 100,
       "collect": 30,
-      "comment": 9
-    },
-    {
-      "title": "笔记 3",
-      "like": 210,
-      "collect": 80,
-      "comment": 40
+      "comment": 10
     }
   ]
 }
